@@ -129,3 +129,45 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
 	}
 }
+
+func TestEvaluateTraceAllow(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["admin"] = Role{Name: "admin", Policies: []string{"policy1"}}
+	store.Users["user1"] = User{Username: "user1", Roles: []string{"admin"}}
+	store.Policies["policy1"] = Policy{
+		ID:       "policy1",
+		Subjects: []Subject{{Role: "admin"}},
+		Resource: []string{"file1"},
+		Action:   []string{"read"},
+		Effect:   "allow",
+	}
+
+	engine := NewPolicyEngine(store)
+	decision := engine.Evaluate("user1", "file1", "read", nil)
+	if len(decision.Trace) == 0 || decision.Trace[0] != "policy policy1 matched: allow" {
+		t.Fatalf("unexpected trace: %v", decision.Trace)
+	}
+}
+
+func TestEvaluateTraceConditionUnsatisfied(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["admin"] = Role{Name: "admin", Policies: []string{"policy1"}}
+	store.Users["user1"] = User{Username: "user1", Roles: []string{"admin"}}
+	store.Policies["policy1"] = Policy{
+		ID:         "policy1",
+		Subjects:   []Subject{{Role: "admin"}},
+		Resource:   []string{"file1"},
+		Action:     []string{"read"},
+		Effect:     "allow",
+		Conditions: map[string]string{"time": "business-hours"},
+	}
+
+	engine := NewPolicyEngine(store)
+	decision := engine.Evaluate("user1", "file1", "read", map[string]string{"time": "20:00"})
+	if decision.Reason != "conditions not satisfied" {
+		t.Fatalf("unexpected reason: %s", decision.Reason)
+	}
+	if len(decision.Trace) == 0 || decision.Trace[0] != "policy policy1 failed: conditions not satisfied" {
+		t.Fatalf("unexpected trace: %v", decision.Trace)
+	}
+}
