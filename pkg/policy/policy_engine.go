@@ -25,9 +25,12 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 		"action":   action,
 	}
 
+	trace := []string{}
+
 	user, exists := pe.store.Users[subject]
 	if !exists {
-		return Decision{Allow: false, Reason: "user not found", Context: ctx}
+		trace = append(trace, "user not found")
+		return Decision{Allow: false, Reason: "user not found", Context: ctx, Trace: trace}
 	}
 
 	for _, roleName := range user.Roles {
@@ -51,28 +54,38 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 					}
 				}
 				if !allowed {
+					trace = append(trace, "policy "+policy.ID+" skipped: subject mismatch")
 					continue
 				}
 			}
 
+			matched := false
 			for _, polResource := range policy.Resource {
 				for _, polAction := range policy.Action {
 					if (polResource == "*" || polResource == resource) &&
 						(polAction == "*" || polAction == action) {
+						matched = true
 						if ok := evaluateConditions(policy.Conditions, env); !ok {
-							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
+							trace = append(trace, "policy "+policy.ID+" failed: conditions not satisfied")
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx, Trace: trace}
 						}
 						switch policy.Effect {
 						case "allow":
-							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx}
+							trace = append(trace, "policy "+policy.ID+" matched: allow")
+							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx, Trace: trace}
 						case "deny":
-							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx}
+							trace = append(trace, "policy "+policy.ID+" matched: deny")
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx, Trace: trace}
 						}
 					}
 				}
 			}
+			if !matched {
+				trace = append(trace, "policy "+policy.ID+" did not match")
+			}
 		}
 	}
 
-	return Decision{Allow: false, Reason: "no matching policy", Context: ctx}
+	trace = append(trace, "no matching policy")
+	return Decision{Allow: false, Reason: "no matching policy", Context: ctx, Trace: trace}
 }

@@ -6,4 +6,5 @@ type Decision struct {
 	PolicyID string            `json:"policy_id,omitempty"`
 	Reason   string            `json:"reason"`
 	Context  map[string]string `json:"context,omitempty"`
+	Trace    []string          `json:"trace,omitempty"`
 }
