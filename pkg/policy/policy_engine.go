@@ -64,7 +64,6 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 				for _, polAction := range policy.Action {
 					if (polResource == "*" || polResource == resource) &&
 						(polAction == "*" || polAction == action) {
-						matched = true
 						if ok := evaluateConditions(policy.Conditions, env); !ok {
 							trace = append(trace, "policy "+policy.ID+" failed: conditions not satisfied")
 							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx, Trace: trace}
