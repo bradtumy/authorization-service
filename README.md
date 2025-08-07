@@ -26,6 +26,26 @@ OIDC_AUDIENCES=authorization-service
 OIDC_TENANT_CLAIM=tenantID
 ```
 
+Example configuration file (`configs/default/config.yaml`):
+
+```yaml
+identity:
+  issuer: "https://idp.example.com/realms/main"
+  jwks_url: "https://idp.example.com/realms/main/protocol/openid-connect/certs"
+  audience: "authorization-service"
+  claims:
+    subject: "sub"
+    username: "preferred_username"
+    tenant: "tenant"
+    roles:
+      - "realm_access.roles"
+      - "resource_access.authorization-service.roles"
+    strip_prefix: ""
+server:
+  addr: ":8080"
+  log_level: "info"
+```
+
 Tokens are verified against the issuer's JWKS and must include `sub`, `aud`, `exp` and the `tenantID` claim (or the name specified by `OIDC_TENANT_CLAIM`). A typical payload looks like:
 
 ```json
