@@ -57,10 +57,10 @@ Use the admin token to register a user `charlie` in tenant `default` with the `a
 curl -X POST http://localhost:8080/user/create \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"tenantID":"acme","username":"charlie","roles":["admin"]}'
+  -d '{"tenantID":"default","username":"charlie","roles":["admin"]}'
 ```
 
-The service persists users under `configs/acme/users.yaml` when started with `--persist-users` (enabled in `docker-compose.yml`).
+The service persists users under `configs/default/users.yaml` when started with `--persist-users` (enabled in `docker-compose.yml`).
 
 ## 5. Add the user to Keycloak
 
