@@ -3,6 +3,15 @@
 ## Overview
 Users encapsulate principals within a tenant and hold zero or more roles. The service exposes endpoints for managing users dynamically at runtime.
 
+## Keycloak Integration
+Set the environment variable `IDENTITY_BACKEND=keycloak` to use Keycloak for identity management. The provider reads the following configuration from the environment:
+
+- `KEYCLOAK_BASE_URL` – base URL of the Keycloak server
+- `KEYCLOAK_CLIENT_ID` – client ID with access to the Admin API
+- `KEYCLOAK_CLIENT_SECRET` – client secret for the client above
+
+Each tenant maps to a Keycloak realm. Users and roles are managed via the Keycloak Admin REST API.
+
 ## API Usage
 Create a user:
 ```sh
