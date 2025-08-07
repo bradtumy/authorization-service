@@ -20,7 +20,7 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 	}
 
 	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithEndpointURL(endpoint),
 		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
