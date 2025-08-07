@@ -68,6 +68,28 @@ Start the service:
 docker compose up --build
 ```
 
+### RBAC Quickstart
+
+Define tenant‑scoped roles and permissions in `configs/default/policy.yaml`:
+
+```yaml
+tenants:
+  default:
+    roles:
+      admin:
+        permissions: ["user:list","user:create","policy:read"]
+      viewer:
+        permissions: ["user:list"]
+```
+
+Load the policy and check access in Go:
+
+```go
+store, _ := policy.NewFileStore("configs/default/policy.yaml")
+authz := authz.NewRBAC(store, time.Minute)
+allowed, _ := authz.IsAllowed(ctx, principal, policy.Permission("user:list"), nil)
+```
+
 Load the sample policy:
 
 ```sh

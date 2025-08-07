@@ -1,0 +1,11 @@
+tenants:
+  default:
+    roles:
+      admin:
+        permissions:
+          - user:list
+          - user:create
+          - policy:read
+      viewer:
+        permissions:
+          - user:list
