@@ -9,7 +9,8 @@ import (
 
 	"github.com/bradtumy/authorization-service/api"
 	"github.com/bradtumy/authorization-service/internal/telemetry"
-	"github.com/bradtumy/authorization-service/pkg/user"
+	"github.com/bradtumy/authorization-service/pkg/identity"
+	"github.com/bradtumy/authorization-service/pkg/identity/local"
 	"github.com/joho/godotenv"
 )
 
@@ -36,7 +37,17 @@ func main() {
 	}
 	defer func() { _ = shutdown(ctx) }()
 
-	user.EnablePersistence(*persistUsers)
+	backend := os.Getenv("IDENTITY_BACKEND")
+	if backend == "" {
+		backend = "local"
+	}
+	switch backend {
+	case "local":
+		prov := local.New(*persistUsers)
+		identity.SetProvider(prov)
+	default:
+		log.Fatalf("unsupported identity backend: %s", backend)
+	}
 	router := api.SetupRouter()
 	log.Println("Starting server on :", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))

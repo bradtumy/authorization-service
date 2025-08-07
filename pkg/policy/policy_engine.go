@@ -1,11 +1,12 @@
 package policy
 
 import (
+	"context"
 	"strings"
 
 	"github.com/bradtumy/authorization-service/pkg/graph"
+	"github.com/bradtumy/authorization-service/pkg/identity"
 	"github.com/bradtumy/authorization-service/pkg/remediation"
-	authuser "github.com/bradtumy/authorization-service/pkg/user"
 )
 
 // PolicyEngine evaluates policies to determine access decisions.
@@ -69,9 +70,11 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 	for idx, subj := range subjects {
 		user, exists := pe.store.Users[subj]
 		if !exists && tenantID != "" {
-			if u, err := authuser.Get(tenantID, subj); err == nil {
-				user = User{Username: u.Username, Roles: u.Roles}
-				exists = true
+			if prov := identity.GetProvider(); prov != nil {
+				if u, err := prov.Get(context.Background(), tenantID, subj); err == nil {
+					user = User{Username: u.Username, Roles: u.Roles}
+					exists = true
+				}
 			}
 		}
 		if !exists {
