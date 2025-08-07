@@ -3,6 +3,16 @@
 ## Overview
 The service validates JSON Web Tokens (JWTs) issued by OpenID Connect providers to authenticate subjects.
 
+Configure the validator with environment variables:
+
+| Variable | Description |
+|---------|-------------|
+| `OIDC_ISSUERS` | Comma-separated list of allowed issuers |
+| `OIDC_AUDIENCES` | Expected audience values, positionally matched with issuers |
+| `OIDC_TENANT_CLAIM` | Claim containing the tenant identifier (default `tenantID`) |
+
+Each request's token must include `sub`, `aud`, `exp`, and the configured tenant claim. Claims such as `email` and `roles` are passed through to request handlers via context for downstream use.
+
 ## Local Keycloak Setup
 Run the services with Docker:
 
@@ -47,4 +57,4 @@ curl -X POST http://localhost:8080/user/create \
 
 ## Notes
 - `roles` claim lists the user's realm roles.
-- `tenantID` claim is hard coded to `acme` for demo purposes.
+- Any OpenID Connect–compliant provider (Keycloak, Auth0, Azure AD, Okta, etc.) can issue tokens for the service.

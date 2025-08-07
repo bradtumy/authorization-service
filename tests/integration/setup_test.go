@@ -1,14 +1,14 @@
 package integration
 
 import (
+	"context"
 	"os"
 	"testing"
 
-	"github.com/bradtumy/authorization-service/internal/middleware"
+	"github.com/bradtumy/authorization-service/pkg/oidc"
 )
 
 func TestMain(m *testing.M) {
-	os.Setenv("OIDC_CONFIG_FILE", "/dev/null")
-	middleware.LoadOIDCConfig()
+	oidc.LoadConfig(context.Background())
 	os.Exit(m.Run())
 }

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bradtumy/authorization-service/pkg/oidc"
 	jwt "github.com/golang-jwt/jwt/v4"
 	jose "gopkg.in/go-jose/go-jose.v2"
 )
@@ -28,7 +30,7 @@ func TestJWTMiddleware(t *testing.T) {
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			json.NewEncoder(w).Encode(map[string]string{"jwks_uri": server.URL + "/keys"})
+			json.NewEncoder(w).Encode(map[string]string{"jwks_uri": server.URL + "/keys", "issuer": server.URL})
 		case "/keys":
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(jwksBytes)
@@ -40,14 +42,16 @@ func TestJWTMiddleware(t *testing.T) {
 
 	os.Setenv("OIDC_ISSUERS", server.URL)
 	os.Setenv("OIDC_AUDIENCES", "test-aud")
-	LoadOIDCConfig()
+	os.Setenv("OIDC_TENANT_CLAIM", "tenantID")
+	oidc.LoadConfig(context.Background())
 
 	makeToken := func(aud string, exp time.Time) string {
 		claims := jwt.MapClaims{
-			"iss": server.URL,
-			"sub": "tester",
-			"aud": aud,
-			"exp": exp.Unix(),
+			"iss":      server.URL,
+			"sub":      "tester",
+			"aud":      aud,
+			"exp":      exp.Unix(),
+			"tenantID": "t",
 		}
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 		token.Header["kid"] = kid
@@ -59,6 +63,9 @@ func TestJWTMiddleware(t *testing.T) {
 	}
 
 	handler := JWTMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Context().Value("subject") == nil || r.Context().Value("tenant") == nil {
+			t.Fatalf("claims not set in context")
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 
