@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/bradtumy/authorization-service/pkg/identity/local"
+	"github.com/bradtumy/authorization-service/pkg/user"
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -21,7 +23,9 @@ func init() {
 var httpLatency *prometheus.HistogramVec
 
 func TestMetricsHandlerRecordsLatency(t *testing.T) {
-	router := SetupRouter()
+	idp := local.New(false)
+	user.SetProvider(idp)
+	router := SetupRouter(idp)
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": "tester", "tenantID": "default"})
 	str, _ := tok.SignedString([]byte("secret"))
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)

@@ -13,7 +13,9 @@ import (
 	"time"
 
 	api "github.com/bradtumy/authorization-service/api"
+	"github.com/bradtumy/authorization-service/pkg/identity/local"
 	"github.com/bradtumy/authorization-service/pkg/oidc"
+	"github.com/bradtumy/authorization-service/pkg/user"
 	jwt "github.com/golang-jwt/jwt/v4"
 	jose "gopkg.in/go-jose/go-jose.v2"
 )
@@ -58,7 +60,9 @@ func TestJWKSRotation(t *testing.T) {
 	os.Setenv("OIDC_JWKS_REFRESH_INTERVAL", "500ms")
 	oidc.LoadConfig(context.Background())
 
-	router := api.SetupRouter()
+	idp := local.New(false)
+	user.SetProvider(idp)
+	router := api.SetupRouter(idp)
 	srv := httptest.NewServer(router)
 	defer srv.Close()
 

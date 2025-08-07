@@ -12,11 +12,11 @@ import (
 	"github.com/bradtumy/authorization-service/internal/middleware"
 	"github.com/bradtumy/authorization-service/pkg/contextprovider"
 	"github.com/bradtumy/authorization-service/pkg/graph"
+	"github.com/bradtumy/authorization-service/pkg/identity"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
 	"github.com/bradtumy/authorization-service/pkg/store"
 	"github.com/bradtumy/authorization-service/pkg/tenant"
-	"github.com/bradtumy/authorization-service/pkg/user"
 	"github.com/bradtumy/authorization-service/pkg/validator"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -45,6 +45,7 @@ var (
 	)
 	tracer           trace.Tracer
 	contextProviders contextprovider.Chain
+	identityProvider identity.Provider
 )
 
 func init() {
@@ -182,14 +183,15 @@ func requireAdmin(w http.ResponseWriter, r *http.Request, tenantID string) (stri
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return "", false
 	}
-	if !user.HasRole(tenant, sub, "TenantAdmin", "PolicyAdmin") {
+	if !identityProvider.HasRole(r.Context(), tenant, sub, "TenantAdmin", "PolicyAdmin") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return "", false
 	}
 	return sub, true
 }
 
-func SetupRouter() *mux.Router {
+func SetupRouter(p identity.Provider) *mux.Router {
+	identityProvider = p
 	router := mux.NewRouter()
 	router.Use(middleware.TracingMiddleware)
 	router.Use(middleware.CorrelationMiddleware)
@@ -576,7 +578,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireAdmin(w, r, req.TenantID); !ok {
 		return
 	}
-	u, err := user.Create(req.TenantID, req.Username, req.Roles)
+	u, err := identityProvider.Create(r.Context(), req.TenantID, req.Username, req.Roles)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -595,7 +597,7 @@ func AssignRole(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireAdmin(w, r, req.TenantID); !ok {
 		return
 	}
-	if err := user.AssignRoles(req.TenantID, req.Username, req.Roles); err != nil {
+	if err := identityProvider.AssignRoles(r.Context(), req.TenantID, req.Username, req.Roles); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -612,7 +614,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireAdmin(w, r, req.TenantID); !ok {
 		return
 	}
-	if err := user.Delete(req.TenantID, req.Username); err != nil {
+	if err := identityProvider.Delete(r.Context(), req.TenantID, req.Username); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -629,7 +631,11 @@ func ListUsers(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireAdmin(w, r, tenantID); !ok {
 		return
 	}
-	list := user.List(tenantID)
+	list, err := identityProvider.List(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
 }
@@ -645,7 +651,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireAdmin(w, r, tenantID); !ok {
 		return
 	}
-	u, err := user.Get(tenantID, username)
+	u, err := identityProvider.Get(r.Context(), tenantID, username)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
