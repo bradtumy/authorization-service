@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"github.com/bradtumy/authorization-service/pkg/tenant"
 	"github.com/bradtumy/authorization-service/pkg/user"
 	"github.com/bradtumy/authorization-service/pkg/validator"
-	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,7 +25,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"strings"
 )
 
 var (
@@ -54,8 +51,6 @@ func init() {
 	if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
 		log.Printf("warning: could not load .env file: %v", err)
 	}
-
-	middleware.LoadOIDCConfig()
 
 	policyStores = make(map[string]*policy.PolicyStore)
 	policyEngines = make(map[string]*policy.PolicyEngine)
@@ -176,34 +171,18 @@ type DeleteUserRequest struct {
 	Username string `json:"username"`
 }
 
-func subjectFromRequest(r *http.Request) (string, error) {
-	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		return "", errors.New("missing token")
-	}
-	tokenString := strings.TrimPrefix(auth, "Bearer ")
-	claims := jwt.MapClaims{}
-	parser := jwt.Parser{}
-	if _, _, err := parser.ParseUnverified(tokenString, claims); err != nil {
-		return "", err
-	}
-	if username, _ := claims["preferred_username"].(string); username != "" {
-		return username, nil
-	}
-	sub, _ := claims["sub"].(string)
-	if sub == "" {
-		return "", errors.New("missing subject")
-	}
-	return sub, nil
-}
-
 func requireAdmin(w http.ResponseWriter, r *http.Request, tenantID string) (string, bool) {
-	sub, err := subjectFromRequest(r)
-	if err != nil {
+	sub, _ := r.Context().Value("subject").(string)
+	tenant, _ := r.Context().Value("tenant").(string)
+	if sub == "" || tenant == "" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return "", false
 	}
-	if !user.HasRole(tenantID, sub, "TenantAdmin", "PolicyAdmin") {
+	if tenantID != "" && tenantID != tenant {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return "", false
+	}
+	if !user.HasRole(tenant, sub, "TenantAdmin", "PolicyAdmin") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return "", false
 	}
@@ -243,7 +222,15 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	engine, ok := policyEngines[req.TenantID]
+	tenantID, _ := r.Context().Value("tenant").(string)
+	subject, _ := r.Context().Value("subject").(string)
+	if tenantID == "" || subject == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	req.TenantID = tenantID
+	req.Subject = subject
+	engine, ok := policyEngines[tenantID]
 	if !ok {
 		http.Error(w, "tenant not found", http.StatusNotFound)
 		return
@@ -311,7 +298,15 @@ func SimulateAccess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	engine, ok := policyEngines[req.TenantID]
+	tenantID, _ := r.Context().Value("tenant").(string)
+	subject, _ := r.Context().Value("subject").(string)
+	if tenantID == "" || subject == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	req.TenantID = tenantID
+	req.Subject = subject
+	engine, ok := policyEngines[tenantID]
 	if !ok {
 		http.Error(w, "tenant not found", http.StatusNotFound)
 		return

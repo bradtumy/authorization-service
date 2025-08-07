@@ -20,11 +20,27 @@ cp .env.example .env
 ```
 CLIENT_ID=my-client-id
 CLIENT_SECRET=my-client-secret
-JWT_SECRET=my-jwt-secret
 PORT=8080
 OIDC_ISSUERS=http://localhost:8081/realms/master
 OIDC_AUDIENCES=authorization-service
+OIDC_TENANT_CLAIM=tenantID
 ```
+
+Tokens are verified against the issuer's JWKS and must include `sub`, `aud`, `exp` and the `tenantID` claim (or the name specified by `OIDC_TENANT_CLAIM`). A typical payload looks like:
+
+```json
+{
+  "iss": "https://idp.example.com/",
+  "sub": "alice",
+  "aud": "authorization-service",
+  "exp": 1700000000,
+  "tenantID": "acme",
+  "email": "alice@example.com",
+  "roles": ["TenantAdmin"]
+}
+```
+
+Any OpenID Connect–compliant provider (Keycloak, Auth0, Azure AD, Okta, etc.) can issue tokens for the service.
 
 Start the service:
 

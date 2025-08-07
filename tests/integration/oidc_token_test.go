@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -11,7 +12,7 @@ import (
 	"time"
 
 	api "github.com/bradtumy/authorization-service/api"
-	"github.com/bradtumy/authorization-service/internal/middleware"
+	"github.com/bradtumy/authorization-service/pkg/oidc"
 	jwt "github.com/golang-jwt/jwt/v4"
 	jose "gopkg.in/go-jose/go-jose.v2"
 )
@@ -28,11 +29,11 @@ func TestOIDCTokenValidation(t *testing.T) {
 	jwksBytes, _ := json.Marshal(jwks)
 
 	// Mock OIDC provider with JWKS endpoint
-	var oidc *httptest.Server
-	oidc = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var oidcSrv *httptest.Server
+	oidcSrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			json.NewEncoder(w).Encode(map[string]string{"jwks_uri": oidc.URL + "/keys"})
+			json.NewEncoder(w).Encode(map[string]string{"jwks_uri": oidcSrv.URL + "/keys", "issuer": oidcSrv.URL})
 		case "/keys":
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(jwksBytes)
@@ -40,24 +41,28 @@ func TestOIDCTokenValidation(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer oidc.Close()
+	defer oidcSrv.Close()
 
 	// Configure middleware to use the mock issuer
-	os.Setenv("OIDC_ISSUERS", oidc.URL)
+	os.Setenv("OIDC_ISSUERS", oidcSrv.URL)
 	os.Setenv("OIDC_AUDIENCES", "test-aud")
-	middleware.LoadOIDCConfig()
+	os.Setenv("OIDC_TENANT_CLAIM", "tenantID")
+	oidc.LoadConfig(context.Background())
 
 	// Start API server
 	router := api.SetupRouter()
 	srv := httptest.NewServer(router)
 	defer srv.Close()
 
-	makeToken := func(iss, aud string, exp time.Time) string {
+	makeToken := func(iss, aud string, exp time.Time, includeTenant bool) string {
 		claims := jwt.MapClaims{
 			"iss": iss,
 			"sub": "tester",
 			"aud": aud,
 			"exp": exp.Unix(),
+		}
+		if includeTenant {
+			claims["tenantID"] = "t"
 		}
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 		token.Header["kid"] = kid
@@ -79,7 +84,7 @@ func TestOIDCTokenValidation(t *testing.T) {
 	}
 
 	t.Run("valid token", func(t *testing.T) {
-		tok := makeToken(oidc.URL, "test-aud", time.Now().Add(time.Hour))
+		tok := makeToken(oidcSrv.URL, "test-aud", time.Now().Add(time.Hour), true)
 		resp := call(tok)
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
@@ -88,7 +93,7 @@ func TestOIDCTokenValidation(t *testing.T) {
 	})
 
 	t.Run("wrong audience", func(t *testing.T) {
-		tok := makeToken(oidc.URL, "other-aud", time.Now().Add(time.Hour))
+		tok := makeToken(oidcSrv.URL, "other-aud", time.Now().Add(time.Hour), true)
 		resp := call(tok)
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusUnauthorized {
@@ -97,7 +102,7 @@ func TestOIDCTokenValidation(t *testing.T) {
 	})
 
 	t.Run("wrong issuer", func(t *testing.T) {
-		tok := makeToken("http://wrong", "test-aud", time.Now().Add(time.Hour))
+		tok := makeToken("http://wrong", "test-aud", time.Now().Add(time.Hour), true)
 		resp := call(tok)
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusUnauthorized {
@@ -106,11 +111,20 @@ func TestOIDCTokenValidation(t *testing.T) {
 	})
 
 	t.Run("expired token", func(t *testing.T) {
-		tok := makeToken(oidc.URL, "test-aud", time.Now().Add(-time.Hour))
+		tok := makeToken(oidcSrv.URL, "test-aud", time.Now().Add(-time.Hour), true)
 		resp := call(tok)
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Fatalf("expected 401 got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("missing tenant", func(t *testing.T) {
+		tok := makeToken(oidcSrv.URL, "test-aud", time.Now().Add(time.Hour), false)
+		resp := call(tok)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("expected 403 got %d", resp.StatusCode)
 		}
 	})
 }
