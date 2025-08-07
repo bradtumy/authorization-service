@@ -53,3 +53,18 @@ The API exposes Prometheus metrics on `/metrics` and traces via OpenTelemetry.
 
 ## Notes & Caveats
 This high-level diagram omits internal caches and background workers for brevity.
+
+## Identity Provider Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant IdP
+    Client->>API: Bearer JWT
+    API->>IdP: Fetch JWKS (cached)
+    IdP-->>API: Signing keys
+    API->>API: Verify iss/aud/exp/nbf
+    API->>API: Map claims to principal
+    API-->>Client: Authorized decision
+```
