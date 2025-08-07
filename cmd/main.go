@@ -9,6 +9,8 @@ import (
 
 	"github.com/bradtumy/authorization-service/api"
 	"github.com/bradtumy/authorization-service/internal/telemetry"
+	"github.com/bradtumy/authorization-service/pkg/identity"
+	"github.com/bradtumy/authorization-service/pkg/identity/local"
 	"github.com/bradtumy/authorization-service/pkg/user"
 	"github.com/joho/godotenv"
 )
@@ -36,8 +38,23 @@ func main() {
 	}
 	defer func() { _ = shutdown(ctx) }()
 
-	user.EnablePersistence(*persistUsers)
-	router := api.SetupRouter()
+	backend := os.Getenv("IDENTITY_BACKEND")
+	if backend == "" {
+		backend = "local"
+	}
+
+	var idProvider identity.Provider
+	switch backend {
+	case "local":
+		idProvider = local.New(*persistUsers)
+	case "keycloak":
+		log.Fatal("keycloak identity provider not implemented")
+	default:
+		log.Fatalf("unknown identity backend: %s", backend)
+	}
+
+	user.SetProvider(idProvider)
+	router := api.SetupRouter(idProvider)
 	log.Println("Starting server on :", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
 }
