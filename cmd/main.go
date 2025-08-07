@@ -10,6 +10,7 @@ import (
 	"github.com/bradtumy/authorization-service/api"
 	"github.com/bradtumy/authorization-service/internal/telemetry"
 	"github.com/bradtumy/authorization-service/pkg/identity"
+	"github.com/bradtumy/authorization-service/pkg/identity/keycloak"
 	"github.com/bradtumy/authorization-service/pkg/identity/local"
 	"github.com/bradtumy/authorization-service/pkg/user"
 	"github.com/joho/godotenv"
@@ -48,7 +49,7 @@ func main() {
 	case "local":
 		idProvider = local.New(*persistUsers)
 	case "keycloak":
-		log.Fatal("keycloak identity provider not implemented")
+		idProvider = keycloak.NewFromEnv()
 	default:
 		log.Fatalf("unknown identity backend: %s", backend)
 	}
