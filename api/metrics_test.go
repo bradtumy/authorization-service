@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	_ "unsafe"
@@ -21,8 +22,10 @@ var httpLatency *prometheus.HistogramVec
 
 func TestMetricsHandlerRecordsLatency(t *testing.T) {
 	router := SetupRouter()
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": "tester", "tenantID": "default"})
+	str, _ := tok.SignedString([]byte("secret"))
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
-	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Authorization", "Bearer "+str)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {

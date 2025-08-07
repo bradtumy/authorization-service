@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,8 +16,10 @@ import (
 func TestCheckAccessSingleTenant(t *testing.T) {
 	reqBody := `{"tenantID":"default","subject":"user1","resource":"file1","action":"read","conditions":{}}`
 	r := httptest.NewRequest(http.MethodPost, "/check-access", strings.NewReader(reqBody))
+	ctx := context.WithValue(r.Context(), "subject", "user1")
+	ctx = context.WithValue(ctx, "tenant", "default")
 	w := httptest.NewRecorder()
-	CheckAccess(w, r)
+	CheckAccess(w, r.WithContext(ctx))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", w.Code)
 	}
@@ -102,7 +105,9 @@ policies:
 	reqA := `{"tenantID":"tenantA","subject":"alice","resource":"file1","action":"read","conditions":{}}`
 	wA := httptest.NewRecorder()
 	rA := httptest.NewRequest(http.MethodPost, "/check-access", strings.NewReader(reqA))
-	CheckAccess(wA, rA)
+	ctxA := context.WithValue(rA.Context(), "subject", "alice")
+	ctxA = context.WithValue(ctxA, "tenant", "tenantA")
+	CheckAccess(wA, rA.WithContext(ctxA))
 	var decA policy.Decision
 	json.NewDecoder(wA.Body).Decode(&decA)
 	if !decA.Allow {
@@ -112,7 +117,9 @@ policies:
 	reqB := `{"tenantID":"tenantB","subject":"alice","resource":"file1","action":"read","conditions":{}}`
 	wB := httptest.NewRecorder()
 	rB := httptest.NewRequest(http.MethodPost, "/check-access", strings.NewReader(reqB))
-	CheckAccess(wB, rB)
+	ctxB := context.WithValue(rB.Context(), "subject", "alice")
+	ctxB = context.WithValue(ctxB, "tenant", "tenantB")
+	CheckAccess(wB, rB.WithContext(ctxB))
 	var decB policy.Decision
 	json.NewDecoder(wB.Body).Decode(&decB)
 	if decB.Allow {
@@ -122,7 +129,9 @@ policies:
 	reqC := `{"tenantID":"missing","subject":"alice","resource":"file1","action":"read","conditions":{}}`
 	wC := httptest.NewRecorder()
 	rC := httptest.NewRequest(http.MethodPost, "/check-access", strings.NewReader(reqC))
-	CheckAccess(wC, rC)
+	ctxC := context.WithValue(rC.Context(), "subject", "alice")
+	ctxC = context.WithValue(ctxC, "tenant", "missing")
+	CheckAccess(wC, rC.WithContext(ctxC))
 	if wC.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for unknown tenant, got %d", wC.Code)
 	}
