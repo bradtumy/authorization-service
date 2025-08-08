@@ -5,6 +5,28 @@
   },
   "item": [
     {
+      "name": "Authorize [Not Yet Available]",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"credential\": {\n    \"@context\": [\"https://www.w3.org/2018/credentials/v1\"],\n    \"id\": \"https://example.org/credentials/3732\",\n    \"type\": [\"VerifiableCredential\"],\n    \"issuer\": \"https://example.org/issuers/14\",\n    \"issuanceDate\": \"2023-01-01T19:23:24Z\",\n    \"credentialSubject\": {\n      \"id\": \"user1\",\n      \"role\": \"admin\"\n    }\n  },\n  \"context\": {\n    \"action\": \"read\",\n    \"resource\": \"file1\",\n    \"environment\": {\n      \"tenantID\": \"default\"\n    },\n    \"consent\": \"granted\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/authorize",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "authorize"
+          ]
+        }
+      }
+    },
+    {
       "name": "Check Access",
       "request": {
         "method": "POST",

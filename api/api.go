@@ -132,6 +132,7 @@ type AuthorizationContext struct {
 	Action      string            `json:"action"`
 	Resource    string            `json:"resource"`
 	Environment map[string]string `json:"environment"`
+	Consent     string            `json:"consent"`
 }
 
 // AuthorizationRequest represents an authorization evaluation request.
@@ -251,6 +252,14 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing action or resource in context", http.StatusBadRequest)
 		return
 	}
+	if req.Context.Consent == "" {
+		http.Error(w, "missing consent in context", http.StatusBadRequest)
+		return
+	}
+	if req.Context.Environment == nil {
+		http.Error(w, "missing environment in context", http.StatusBadRequest)
+		return
+	}
 	subj, ok := req.Credential.CredentialSubject["id"].(string)
 	if !ok || subj == "" {
 		http.Error(w, "invalid credential: missing credentialSubject.id", http.StatusBadRequest)
@@ -274,7 +283,16 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 	for k, v := range ctxVals {
 		conds[k] = v
 	}
+	for k, v := range req.Credential.CredentialSubject {
+		if k == "id" {
+			continue
+		}
+		if str, ok := v.(string); ok {
+			conds[k] = str
+		}
+	}
 	conds["tenantID"] = tenantID
+	conds["consent"] = req.Context.Consent
 	_, evalSpan := tracer.Start(ctx, "PolicyEvaluation")
 	for k, v := range conds {
 		evalSpan.SetAttributes(attribute.String(k, v))
