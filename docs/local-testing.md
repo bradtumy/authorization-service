@@ -1,6 +1,6 @@
 # Local End-to-End Testing
 
-The following steps walk through a complete flow of running the service, creating users, obtaining tokens, and verifying policy decisions. The service ships with a default tenant named `default`. For local testing we seed it with demo users copied from the `acme` example.
+The following steps walk through a complete flow of running the service, creating users, obtaining tokens, verifying policy decisions, and exercising the Verifiable Credential (VC) framework end-to-end. The service ships with a default tenant named `default`. For local testing we seed it with demo users copied from the `acme` example.
 
 
 ## 1. Start the stack
@@ -95,7 +95,23 @@ Expected response:
 
 Access checks do not require an authentication header, but other management endpoints do. Use the `Authorization: Bearer $CHARLIE_TOKEN` header with APIs that require authentication.
 
-## 8. Clean up
+## 8. Evaluate a Verifiable Credential
+
+With the stack still running, test the VC authorization flow using the sample credential and context files:
+
+```sh
+curl -X POST http://localhost:8080/authorize \
+  -H 'Content-Type: application/json' \
+  -d @<(jq -s '{credential:.[0], context:.[1]}' examples/vc.json examples/context.json)
+```
+
+Expected response:
+
+```json
+{"allow":true}
+```
+
+## 9. Clean up
 
 Stop the services when finished:
 
@@ -103,4 +119,4 @@ Stop the services when finished:
 docker compose down -v
 ```
 
-This sequence demonstrates creating a user, acquiring tokens, and verifying policies in a local environment.
+This sequence demonstrates creating a user, acquiring tokens, verifying policies, and evaluating Verifiable Credentials in a local environment.
