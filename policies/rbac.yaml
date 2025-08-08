@@ -1,0 +1,11 @@
+- id: admin-read
+  effect: allow
+  roles: ["admin"]
+  actions: ["read"]
+  resources: ["*"]
+
+- id: admin-read-deny
+  effect: deny
+  actions: ["read"]
+  resources: ["*"]
+  advice: admin role required

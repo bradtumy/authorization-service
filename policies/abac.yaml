@@ -1,0 +1,12 @@
+- id: sales-view
+  effect: allow
+  actions: ["view"]
+  resources: ["report"]
+  conditions:
+    department: sales
+
+- id: sales-view-deny
+  effect: deny
+  actions: ["view"]
+  resources: ["report"]
+  advice: sales department required
