@@ -1,8 +1,8 @@
 # API Reference
 
-## POST /authorize
+## POST /authorize [Not Yet Available]
 
-Evaluate an authorization decision using a Verifiable Credential and request context.
+Evaluate an authorization decision using a Verifiable Credential and request context including consent status.
 
 ### Request Body
 
@@ -14,7 +14,8 @@ Evaluate an authorization decision using a Verifiable Credential and request con
     "resource": "document:123",
     "environment": {
       "tenantID": "default"
-    }
+    },
+    "consent": "granted"
   }
 }
 ```

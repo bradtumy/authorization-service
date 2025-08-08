@@ -1,6 +1,6 @@
-# Examples
+# Examples [Not Yet Available]
 
-Sample Verifiable Credential and context files are available in the `examples` directory.
+Sample Verifiable Credential and context files (including consent status) are available in the `examples` directory.
 
 ```bash
 curl -X POST http://localhost:8080/authorize \

@@ -1,0 +1,70 @@
+openapi: 3.0.3
+info:
+  title: Authorization Service API
+  version: 0.1.0
+paths:
+  /authorize:
+    post:
+      summary: Evaluate authorization decision using a Verifiable Credential [Not Yet Available]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizationRequest'
+      responses:
+        '200':
+          description: Authorization decision
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - authorization
+components:
+  schemas:
+    AuthorizationRequest:
+      type: object
+      required: [credential, context]
+      properties:
+        credential:
+          $ref: '#/components/schemas/VerifiableCredential'
+        context:
+          $ref: '#/components/schemas/AuthorizationContext'
+    VerifiableCredential:
+      type: object
+      required: ['@context', id, type, issuer, issuanceDate, credentialSubject]
+      properties:
+        '@context':
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        type:
+          type: array
+          items:
+            type: string
+        issuer:
+          type: string
+        issuanceDate:
+          type: string
+          format: date-time
+        credentialSubject:
+          type: object
+          additionalProperties: true
+    AuthorizationContext:
+      type: object
+      required: [action, resource, environment, consent]
+      properties:
+        action:
+          type: string
+        resource:
+          type: string
+        environment:
+          type: object
+          additionalProperties:
+            type: string
+        consent:
+          type: string
+          description: Consent status for the request
