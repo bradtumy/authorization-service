@@ -117,6 +117,29 @@ func init() {
 	}
 }
 
+// VerifiableCredential represents a W3C Verifiable Credential.
+type VerifiableCredential struct {
+	Context           []string               `json:"@context"`
+	ID                string                 `json:"id"`
+	Type              []string               `json:"type"`
+	Issuer            string                 `json:"issuer"`
+	IssuanceDate      time.Time              `json:"issuanceDate"`
+	CredentialSubject map[string]interface{} `json:"credentialSubject"`
+}
+
+// AuthorizationContext contains metadata for an authorization request.
+type AuthorizationContext struct {
+	Action      string            `json:"action"`
+	Resource    string            `json:"resource"`
+	Environment map[string]string `json:"environment"`
+}
+
+// AuthorizationRequest represents an authorization evaluation request.
+type AuthorizationRequest struct {
+	Credential VerifiableCredential `json:"credential"`
+	Context    AuthorizationContext `json:"context"`
+}
+
 type AccessRequest struct {
 	TenantID   string            `json:"tenantID"`
 	Subject    string            `json:"subject"`
@@ -197,6 +220,7 @@ func SetupRouter(p identity.Provider) *mux.Router {
 	router.Use(middleware.CorrelationMiddleware)
 	router.Use(middleware.MetricsMiddleware)
 	router.Use(middleware.JWTMiddleware)
+	router.HandleFunc("/authorize", Authorize).Methods("POST")
 	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
 	router.HandleFunc("/simulate", SimulateAccess).Methods("POST")
 	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
@@ -212,6 +236,62 @@ func SetupRouter(p identity.Provider) *mux.Router {
 	router.HandleFunc("/user/get", GetUser).Methods("GET")
 	router.Handle("/metrics", promhttp.Handler()).Methods("GET")
 	return router
+}
+
+// Authorize evaluates an authorization request using a Verifiable Credential.
+func Authorize(w http.ResponseWriter, r *http.Request) {
+	ctx, span := tracer.Start(r.Context(), "Authorize")
+	defer span.End()
+	var req AuthorizationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Context.Action == "" || req.Context.Resource == "" {
+		http.Error(w, "missing action or resource in context", http.StatusBadRequest)
+		return
+	}
+	subj, ok := req.Credential.CredentialSubject["id"].(string)
+	if !ok || subj == "" {
+		http.Error(w, "invalid credential: missing credentialSubject.id", http.StatusBadRequest)
+		return
+	}
+	tenantID, ok := req.Context.Environment["tenantID"]
+	if !ok || tenantID == "" {
+		http.Error(w, "missing tenantID in environment", http.StatusBadRequest)
+		return
+	}
+	engine, ok := policyEngines[tenantID]
+	if !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
+	ctxVals := contextProviders.GetContext(r)
+	conds := make(map[string]string)
+	for k, v := range req.Context.Environment {
+		conds[k] = v
+	}
+	for k, v := range ctxVals {
+		conds[k] = v
+	}
+	conds["tenantID"] = tenantID
+	_, evalSpan := tracer.Start(ctx, "PolicyEvaluation")
+	for k, v := range conds {
+		evalSpan.SetAttributes(attribute.String(k, v))
+	}
+	decision := engine.Evaluate(subj, req.Context.Resource, req.Context.Action, conds)
+	status := "deny"
+	if decision.Allow {
+		status = "allow"
+	}
+	evalSpan.SetAttributes(
+		attribute.String("decision", status),
+		attribute.String("reason", decision.Reason),
+	)
+	evalSpan.End()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(decision)
 }
 
 func CheckAccess(w http.ResponseWriter, r *http.Request) {
