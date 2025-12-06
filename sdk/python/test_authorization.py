@@ -3,7 +3,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from authorization import Client
+from sdk.python.authorization import Client
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -21,6 +21,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b'policy is valid')
+        elif self.path == '/simulate':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(b'{"allow": false, "reason": "simulated"}')
         else:
             self.send_response(404)
             self.end_headers()
@@ -32,7 +37,7 @@ class TestClient(unittest.TestCase):
         cls.server = HTTPServer(('localhost', 0), Handler)
         cls.port = cls.server.server_address[1]
         cls.thread = threading.Thread(target=cls.server.serve_forever)
-        cls.thread.setDaemon(True)
+        cls.thread.daemon = True
         cls.thread.start()
 
     @classmethod
@@ -41,7 +46,7 @@ class TestClient(unittest.TestCase):
         cls.thread.join()
 
     def setUp(self):
-        self.client = Client(f'http://localhost:{self.port}')
+        self.client = Client(f'http://localhost:{self.port}', token='abc123')
 
     def test_check_access(self):
         decision = self.client.check_access('t', 's', 'r', 'a')
@@ -55,7 +60,11 @@ class TestClient(unittest.TestCase):
         resp = self.client.validate_policy('t', 'policy')
         self.assertIn('valid', resp)
 
+    def test_simulate_access(self):
+        decision = self.client.simulate_access('t', 's', 'r', 'a', {'k': 'v'})
+        self.assertFalse(decision['allow'])
+        self.assertEqual('simulated', decision['reason'])
+
 
 if __name__ == '__main__':
     unittest.main()
-
