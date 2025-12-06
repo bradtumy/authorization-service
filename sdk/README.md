@@ -1,115 +1,87 @@
-# Authorization SDK for Node.js
+# Authorization SDKs
 
-## Overview
+This directory contains lightweight SDK clients for the authorization service in Node.js, Go, and Python. All SDKs align with the API routes exposed by the service and mirror the behavior of the `authzctl` terminal utility (e.g., `/check-access`, `/simulate`, `/compile`, `/validate-policy`).
 
-This SDK provides a convenient way for Node.js applications to interact with an authorization service. It allows developers to generate authentication tokens and evaluate access policies based on predefined rules.
-
-## Features
-
-- **Token Generation**: Generate authentication tokens using client credentials.
-- **Policy Evaluation**: Evaluate access policies based on subject, resource, and action.
-
-## Installation
-
-To install the SDK, you can use npm:
-
-```bash
-npm install @yourorganization/authorization-sdk
-```
-
-## Usage
+## Node.js
 
 ### Configuration
 
-Before using the SDK, make sure to set up your environment variables. Create a `.env` file in your project root with the following variables:
+- `AUTHZ_ADDR`/`AUTHZCTL_ADDR` (optional): Base URL for the service. Defaults to `http://localhost:8080`.
+- `AUTHZ_TOKEN`/`AUTHZCTL_TOKEN` (optional): Bearer token to include on requests.
 
-```dotenv
-SDK_CLIENT_ID=your_client_id_here
-SDK_CLIENT_SECRET=your_client_secret_here
-```
-
-### Example
-
-Here’s how you can use the SDK in your Node.js application (`index.js`):
+### Usage
 
 ```javascript
-require('dotenv').config(); // Load environment variables from .env file
-const AuthorizationSDK = require('@yourorganization/authorization-sdk');
+const AuthorizationSDK = require('./AuthorizationSDK');
+const sdk = new AuthorizationSDK({ baseUrl: 'http://localhost:8080', token: 'my-token' });
 
-// Initialize SDK with client credentials
-const sdk = new AuthorizationSDK({
-  clientId: process.env.SDK_CLIENT_ID,
-  clientSecret: process.env.SDK_CLIENT_SECRET,
+const decision = await sdk.checkAccess({
+  tenantID: 't1',
+  subject: 'user',
+  resource: 'file',
+  action: 'read',
+  conditions: { ip: '127.0.0.1' },
 });
 
-// Example usage to evaluate policy
-async function evaluatePolicy() {
-  const subject = 'user2';
-  const resource = 'file2';
-  const action = 'read';
+const simulation = await sdk.simulateAccess({
+  tenantID: 't1',
+  subject: 'user',
+  resource: 'file',
+  action: 'read',
+  context: { environment: 'dev' },
+});
 
-  try {
-    // Generate token using SDK method
-    const token = await sdk.generateToken();
-
-    // Call SDK method to evaluate policy
-    const decision = await sdk.checkAccess(token, subject, resource, action);
-
-    console.log('Policy Evaluation Result:', decision);
-  } catch (error) {
-    console.error('Error:', error.message);
-  }
-}
-
-// Call the example function
-evaluatePolicy();
+const compiled = await sdk.compileRule('t1', 'allow subject where true');
+const validation = await sdk.validatePolicy('t1', 'policy: allow');
 ```
 
-### SDK Methods
+### Tests
 
-#### `generateToken()`
+Run `node --test sdk/AuthorizationSDK.test.js`.
 
-Generates an authentication token using client credentials.
+## Go
 
-```javascript
-async function generateToken() {
-  try {
-    const token = await sdk.generateToken();
-    console.log('Generated Token:', token);
-  } catch (error) {
-    console.error('Failed to generate token:', error.message);
-  }
-}
+```go
+client := sdk.NewClient("http://localhost:8080")
+
+// Check access
+result, err := client.CheckAccess(sdk.AccessRequest{
+    TenantID: "t1",
+    Subject:  "user",
+    Resource: "file",
+    Action:   "read",
+})
+
+// Simulate with explicit context
+simulation, err := client.SimulateAccess(sdk.SimulationRequest{
+    TenantID: "t1",
+    Subject:  "user",
+    Resource: "file",
+    Action:   "read",
+    Context:  map[string]string{"environment": "dev"},
+})
+
+// Compile and validate policies
+compiled, err := client.CompileRule("t1", "allow subject where true")
+err = client.ValidatePolicy("t1", "policy: allow")
 ```
 
-#### `checkAccess(token, subject, resource, action)`
+Run `go test ./sdk/go` to execute the Go SDK tests.
 
-Checks access based on the provided authentication token, subject, resource, and action.
+## Python
 
-```javascript
-async function checkAccess() {
-  const token = 'your_generated_token';
-  const subject = 'user1';
-  const resource = 'file1';
-  const action = 'read';
+```python
+from sdk.python.authorization import Client
 
-  try {
-    const decision = await sdk.checkAccess(token, subject, resource, action);
-    console.log('Access Decision:', decision);
-  } catch (error) {
-    console.error('Failed to check access:', error.message);
-  }
-}
+client = Client('http://localhost:8080', token='my-token')
+
+# Check and simulate
+client.check_access('t1', 'user', 'file', 'read', {'ip': '127.0.0.1'})
+client.simulate_access('t1', 'user', 'file', 'read', {'environment': 'dev'})
+
+# Compile and validate
+client.compile_rule('t1', 'allow subject where true')
+client.validate_policy('t1', 'policy: allow')
 ```
 
-## Contributing
-
-Contributions are welcome! If you find any issues or have suggestions for improvements, please open an issue or submit a pull request on GitHub.
-
-## License
-
-This SDK is licensed under the MIT License. See the LICENSE file for more details.
-
----
-
-Adjust the placeholders (`@yourorganization/authorization-sdk`) with your actual package name if you plan to publish it on npm. Ensure to provide clear and concise examples, detailed usage instructions, and guidelines for setting up and configuring the SDK in different environments.
+Run `python -m pytest sdk/python/test_authorization.py` to exercise the Python SDK.
