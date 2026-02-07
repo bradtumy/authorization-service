@@ -20,6 +20,9 @@ cp .env.example .env
 ```
 CLIENT_ID=my-client-id
 CLIENT_SECRET=my-client-secret
+TOKEN_SIGNING_KEY=dev-secret
+TOKEN_ISSUER=authorization-service
+TOKEN_AUDIENCE=authorization-service
 PORT=8080
 OIDC_ISSUERS=http://localhost:8081/realms/master
 OIDC_AUDIENCES=authorization-service
@@ -66,6 +69,17 @@ Start the service:
 
 ```sh
 docker compose up --build
+```
+
+### OAuth Token Quickstart
+
+Issue a client credentials token:
+
+```sh
+curl -s -X POST http://localhost:8080/token \
+  -u "$CLIENT_ID:$CLIENT_SECRET" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=client_credentials&tenant_id=default&scope=read'
 ```
 
 ### RBAC Quickstart
@@ -198,6 +212,10 @@ curl -s -X POST http://localhost:8080/check-access \
 - [Simulation](docs/simulation.md)
 - [OIDC](docs/oidc.md)
 - [Observability](docs/observability.md)
+- [Policy Hooks](docs/policy-hooks.md)
+- [Agent Delegation](docs/agent-delegation.md)
+- [CIBA Stub](docs/ciba-stub.md)
+- [Security](docs/security.md)
 - [Deployment](docs/deployment.md)
 - [Contributing](docs/contributing.md)
 - [Architecture](docs/architecture.md) · [Flows](docs/flows.md)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/bradtumy/authorization-service/internal/logger"
 	"github.com/bradtumy/authorization-service/internal/middleware"
+	"github.com/bradtumy/authorization-service/internal/oauth"
 	"github.com/bradtumy/authorization-service/pkg/contextprovider"
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/identity"
@@ -36,6 +37,7 @@ var (
 	policyBackend string
 	compiler      policycompiler.Compiler
 	auditLogger   *logger.Logger
+	tokenService  *oauth.TokenService
 	policyEval    = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "policy_eval_count",
@@ -108,6 +110,7 @@ func init() {
 	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
 	lvl := logger.ParseLevel(os.Getenv("LOG_LEVEL"))
 	auditLogger = logger.New(os.Stdout, lvl)
+	tokenService = newTokenService()
 	prometheus.MustRegister(policyEval)
 	tracer = otel.Tracer("authorization-service")
 	contextProviders = contextprovider.Chain{
@@ -220,22 +223,24 @@ func SetupRouter(p identity.Provider) *mux.Router {
 	router.Use(middleware.TracingMiddleware)
 	router.Use(middleware.CorrelationMiddleware)
 	router.Use(middleware.MetricsMiddleware)
-	router.Use(middleware.JWTMiddleware)
-	router.HandleFunc("/authorize", Authorize).Methods("POST")
-	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
-	router.HandleFunc("/simulate", SimulateAccess).Methods("POST")
-	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
-	router.HandleFunc("/compile", CompileRule).Methods("POST")
-	router.HandleFunc("/validate-policy", ValidatePolicy).Methods("POST")
-	router.HandleFunc("/tenant/create", CreateTenant).Methods("POST")
-	router.HandleFunc("/tenant/delete", DeleteTenant).Methods("POST")
-	router.HandleFunc("/tenant/list", ListTenants).Methods("GET")
-	router.HandleFunc("/user/create", CreateUser).Methods("POST")
-	router.HandleFunc("/user/assign-role", AssignRole).Methods("POST")
-	router.HandleFunc("/user/delete", DeleteUser).Methods("POST")
-	router.HandleFunc("/user/list", ListUsers).Methods("GET")
-	router.HandleFunc("/user/get", GetUser).Methods("GET")
-	router.Handle("/metrics", promhttp.Handler()).Methods("GET")
+	router.HandleFunc("/token", Token).Methods("POST")
+	protected := router.NewRoute().Subrouter()
+	protected.Use(middleware.JWTMiddleware)
+	protected.HandleFunc("/authorize", Authorize).Methods("POST")
+	protected.HandleFunc("/check-access", CheckAccess).Methods("POST")
+	protected.HandleFunc("/simulate", SimulateAccess).Methods("POST")
+	protected.HandleFunc("/reload", ReloadPolicies).Methods("POST")
+	protected.HandleFunc("/compile", CompileRule).Methods("POST")
+	protected.HandleFunc("/validate-policy", ValidatePolicy).Methods("POST")
+	protected.HandleFunc("/tenant/create", CreateTenant).Methods("POST")
+	protected.HandleFunc("/tenant/delete", DeleteTenant).Methods("POST")
+	protected.HandleFunc("/tenant/list", ListTenants).Methods("GET")
+	protected.HandleFunc("/user/create", CreateUser).Methods("POST")
+	protected.HandleFunc("/user/assign-role", AssignRole).Methods("POST")
+	protected.HandleFunc("/user/delete", DeleteUser).Methods("POST")
+	protected.HandleFunc("/user/list", ListUsers).Methods("GET")
+	protected.HandleFunc("/user/get", GetUser).Methods("GET")
+	protected.Handle("/metrics", promhttp.Handler()).Methods("GET")
 	return router
 }
 
